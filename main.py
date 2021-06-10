@@ -1,55 +1,64 @@
 import numpy as np
-from sklearn.cluster import MeanShift, estimate_bandwidth
 import cv2
 
-
-img = cv2.imread('img15.png')
-img = cv2.medianBlur(img, 3)
-
-
-flat_image = img.reshape((-1,3)) #flattening the imgage so it is no longer 3 dimensional
-flat_image = np.float32(flat_image)
-
-
-bandwidth = estimate_bandwidth(flat_image, quantile=0.06, n_samples=3000)
-ms = MeanShift(bandwidth, max_iter=800, bin_seeding=True)
-ms.fit(flat_image)
-labeled=ms.labels_ #labels each individual class into segements
-segments = np.unique(labeled)
-cluster_centers = ms.cluster_centers_
-cluster_centers = np.uint8(cluster_centers)
-
-textfile = open("clusters.txt", "w+")#here clusters centers will be saved
-
-print('Number of segments: ', segments.shape[0])
-
-
-total = np.zeros((segments.shape[0], 3), dtype=float)
-count = np.zeros(total.shape, dtype=float)
-for i, label in enumerate(labeled):
-    total[label] = total[label] + flat_image[i]
-    count[label] += 1
-avg = total/count
-avg = np.uint8(avg)
-
-#turning cluster_centers into list of tuples- [(),().....]
-#color_boundaries = []
-#for i in range(cluster_centers.shape[0]):
-#    color_boundaries.append((cluster_centers[i][0],cluster_centers[i][1],cluster_centers[i][2]))
-
-#saving cluster centers into the file
-np.savetxt("clusters.txt", cluster_centers)
-textfile.close()
-
-# cast the labeled image into the corresponding average color
-res = avg[labeled]
-result = res.reshape((img.shape))
+#def from_min_to_max(img_g,minimum,maximum):
+#    ret, mask = cv2.threshold(gray, minimum, maximum, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+#    kernel = np.ones((9, 9), np.uint8)
+#    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+#    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+#    return mask
+#
+#def from_min_to_avg(img_g,minimum,avg):
+#    ret, mask = cv2.threshold(gray, minimum, avg, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+#    kernel = np.ones((9, 9), np.uint8)
+#    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+#    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+#    return mask
+#
+#def from_avg_to_max(img_g,avg,maximum):
+#    ret, mask = cv2.threshold(gray, avg, maximum, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+#    kernel = np.ones((9, 9), np.uint8)
+#    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+#    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+#    return mask
 
 
-# show the result
-cv2.imshow('result',result)
-cv2.imwrite("mean_shift_result.png", result)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+image = cv2.imread('mean_shift_result.png')
+original_img = image.copy()
+image_copy2 = image.copy()
+
+data_of_clusters = np.loadtxt("clusters.txt", dtype=str)
+data_of_clusters = data_of_clusters.astype(np.float64)
+#print(data_of_clusters[0]) = [151 131 120] <-- first color I want to detect
+
+gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#the idea is to use funcs above to apply threshold and use every element of data_of_clusters elements
+#right now it only uses min and max but maybe also avg can help
+for i in range(21):
+    actual_max = np.amax(data_of_clusters[i])
+    actual_min = np.amin(data_of_clusters[i])
+    #actual_avg =
+    ret, mask = cv2.threshold(gray, actual_min, actual_max, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    kernel = np.ones((9, 9), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
 
+
+
+
+# threshold input image using otsu thresholding as mask and refine with morphology
+#ret, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+#kernel = np.ones((9,9), np.uint8)
+#mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+#mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+# put mask into alpha channel of result
+result = image.copy()
+result = cv2.cvtColor(result, cv2.COLOR_BGR2BGRA)
+result[:, :, 3] = mask
+
+# save resulting masked image
+cv2.imwrite('retina_masked.png', result)
+cv2.imshow("result",result)
+cv2.waitKey()
